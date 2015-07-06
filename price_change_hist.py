@@ -7,12 +7,16 @@ hisotrical quote directory:
 needs to contain a txt file for every ticker in the format (with header line!):
 Date,Open,High,Low,Close,Volume,Adj Close
 Sample GOOG.txt: 2015-06-29,525.01001,528.609985,520.539978,521.52002,1930900,521.52002
+
+Run with:
+cat data/marketbeat_nasdaq.csv | python price_change_hist.py > data/marketbeat_nasdaq_price_changes_TIMEDIFF.csv
 '''
 from collections import defaultdict
 
 import csv
 #from collections import defaultdict
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from bisect import bisect_left
 from sys import stdin
 from ordereddefaultdict import OrderedDefaultdict, DefaultOrderedDict
@@ -31,6 +35,8 @@ FIELD_QUOTE_PRICE   = 6 # take the adjusted closing price
 RECS_DATE_FORMAT = '%m/%d/%Y'
 QUOTES_DATE_FORMAT = '%Y-%m-%d'
 HISTORICAL_QUOTES_PATH = 'historical-quotes/'
+RANKING_PICKLE_FILE = 'data/ranking_1yr.pkl'
+DATE_CHANGE = relativedelta(year=1)  # months=6)
 
 def find_closest(myList, myNumber):
     """
@@ -55,11 +61,11 @@ class DatesNotAvailableException(Exception):
     pass
 
 def save_obj(obj, name ):
-    with open(name + '.pkl', 'wb') as f:
+    with open(name, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name ):
-    with open(name + '.pkl', 'rb') as f:
+    with open(name, 'rb') as f:
         return pickle.load(f)
 
 def get_price_change(ticker, start_date, end_date):
@@ -91,10 +97,10 @@ def main(input_file=stdin):
     ranking = defaultdict(list)
     for l in csv.reader(input_file):
         rec_date = datetime.strptime(l[FIELD_REC_DATE], RECS_DATE_FORMAT)
-        year_later = rec_date.replace(year=rec_date.year+1)
+        later_date = rec_date + DATE_CHANGE
 
         try:
-            start, end, delta = get_price_change(l[FIELD_REC_TICKER], rec_date, year_later)
+            start, end, delta = get_price_change(l[FIELD_REC_TICKER], rec_date, later_date)
         except DatesNotAvailableException:  # Catch when dates are not available
             continue
 
@@ -109,7 +115,7 @@ def main(input_file=stdin):
                         re.sub('(.*\s*->\s*)(?P<to>.*)', '\\g<to>', l[FIELD_REC_RANK]),
                         l[FIELD_REC_DATE], l[FIELD_REC_PRICE_1Y], str(start), str(end), str(delta)])
 
-    save_obj(ranking, 'data/ranking')
+    save_obj(ranking, RANKING_PICKLE_FILE)
 
 
 if __name__ == "__main__":

@@ -42,3 +42,7 @@ Files
     http://stackoverflow.com/questions/4126348/how-do-i-rewrite-this-function-to-implement-ordereddict/4127426#4127426
     OrderedDefaultDict allows to create an ordered dictionary with a default type so we don't have to worry about 
     initialization when placing a list (for instance) inside the dict.
+
+## filter-top-20-analysts.sh
+    Shell script for taking the analysts with the most recommendations (top 20), and creating a separate recommendation
+    file for each under data/top20_analysts.csv.

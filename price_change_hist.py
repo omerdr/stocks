@@ -10,6 +10,10 @@ Sample GOOG.txt: 2015-06-29,525.01001,528.609985,520.539978,521.52002,1930900,52
 
 Run with:
 cat data/marketbeat_nasdaq.csv | python price_change_hist.py > data/marketbeat_nasdaq_price_changes_TIMEDIFF.csv
+
+Also (for separating analysts):
+cd ~/github/stocks/data/top20_analysts
+find . | parallel "cat {} | python ../../price_change_hist.py --pickle-file {}.pkl -"
 '''
 from collections import defaultdict
 
@@ -22,6 +26,7 @@ from sys import stdin
 from ordereddefaultdict import OrderedDefaultdict, DefaultOrderedDict
 import pickle
 import re
+import click
 
 FIELD_REC_TICKER    = 0
 FIELD_REC_DATE      = 1
@@ -34,9 +39,9 @@ FIELD_QUOTE_PRICE   = 6 # take the adjusted closing price
 
 RECS_DATE_FORMAT = '%m/%d/%Y'
 QUOTES_DATE_FORMAT = '%Y-%m-%d'
-HISTORICAL_QUOTES_PATH = 'historical-quotes/'
-RANKING_PICKLE_FILE = 'data/ranking_1yr.pkl'
-DATE_CHANGE = relativedelta(year=1)  # months=6)
+HISTORICAL_QUOTES_PATH = '/home/omer/code/github/stocks/historical-quotes/'
+#DEFAULT_RANKING_PICKLE_FILE = 'data/ranking.pkl'
+DATE_CHANGE = relativedelta(years=1)  # months=6)
 
 def find_closest(myList, myNumber):
     """
@@ -93,9 +98,12 @@ def get_price_change(ticker, start_date, end_date):
         return start, end, end / start
 
 
-def main(input_file=stdin):
+@click.command()
+@click.option('--pickle-file', help='ranking dictionary pickle output file', default=None, type=unicode)  # default=DEFAULT_RANKING_PICKLE_FILE,
+@click.argument('input', type=click.File('rb'))
+def price_change_hist(input, pickle_file):
     ranking = defaultdict(list)
-    for l in csv.reader(input_file):
+    for l in csv.reader(input):
         rec_date = datetime.strptime(l[FIELD_REC_DATE], RECS_DATE_FORMAT)
         later_date = rec_date + DATE_CHANGE
 
@@ -115,12 +123,14 @@ def main(input_file=stdin):
                         re.sub('(.*\s*->\s*)(?P<to>.*)', '\\g<to>', l[FIELD_REC_RANK]),
                         l[FIELD_REC_DATE], l[FIELD_REC_PRICE_1Y], str(start), str(end), str(delta)])
 
-    save_obj(ranking, RANKING_PICKLE_FILE)
+    if pickle_file:
+        save_obj(ranking, pickle_file)
 
 
 if __name__ == "__main__":
     try:
-        with open('data/marketbeat_nasdaq.csv') as fp:
-            main(fp)
+        price_change_hist()
+        # with open('data/marketbeat_nasdaq.csv') as fp:
+        #     price_change_hist(fp)
     except KeyboardInterrupt:
         pass

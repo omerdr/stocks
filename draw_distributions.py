@@ -12,11 +12,11 @@ def load_obj(name ):
     with open(name, 'rb') as f:
         return pickle.load(f)
 
-def draw_hist(values):
-        h = plt.hist(v, bins=20, range=(0.2, 2.0), facecolor='green')  #, normed=1, alpha=0.5)
-        m = mean(ranking[k])
-        med = median(ranking[k])
-        s = std(ranking[k])
+def draw_hist(title, values):
+        h = plt.hist(values, bins=20, range=(0.2, 2.0), facecolor='green')  #, normed=1, alpha=0.5)
+        m = mean(values)
+        med = median(values)
+        s = std(values)
         max_count = max(h[0])
         plt.axvline(m, color='r', linestyle='-')
         plt.axvline(m+s, color='r', linestyle='--')
@@ -31,7 +31,7 @@ def draw_hist(values):
 
         # Prettify
         #plt.suptitle(k)
-        plt.title("Rank: %s, median: %0.4g, mean: %0.4g, std: %0.4g" % (k,med,m,s))
+        plt.title("Rank: %s, median: %0.4g, mean: %0.4g, std: %0.4g" % (title,med,m,s))
         plt.xlabel('1-year Percentage Change')
         plt.ylabel('Count')
         plt.subplots_adjust(left=0.15) # tweak spacing to prevent clipping of y-label

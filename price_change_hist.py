@@ -14,6 +14,11 @@ cat data/marketbeat_nasdaq.csv | python price_change_hist.py > data/marketbeat_n
 Also (for separating analysts):
 cd ~/github/stocks/data/top20_analysts
 find . | parallel "cat {} | python ../../price_change_hist.py --pickle-file {}.pkl -"
+
+pycharm args:
+--pickle-file data/top20_analysts/test-bank-of-america.pkl "data/top20_analysts/Bank of America.csv"
+data/marketbeat_nasdaq.csv
+
 '''
 from collections import defaultdict
 
@@ -42,6 +47,8 @@ QUOTES_DATE_FORMAT = '%Y-%m-%d'
 HISTORICAL_QUOTES_PATH = '/home/omer/code/github/stocks/historical-quotes/'
 #DEFAULT_RANKING_PICKLE_FILE = 'data/ranking.pkl'
 DATE_CHANGE = relativedelta(years=1)  # months=6)
+
+HEADER_LINE = 'Ticker,Firm,Action,Date,Old Target,New Target,Target Ratio,Current Price,Price in a year,Price Ratio'
 
 def find_closest(myList, myNumber):
     """
@@ -103,6 +110,7 @@ def get_price_change(ticker, start_date, end_date):
 @click.argument('input', type=click.File('rb'))
 def price_change_hist(input, pickle_file):
     ranking = defaultdict(list)
+    print HEADER_LINE
     for l in csv.reader(input):
         rec_date = datetime.strptime(l[FIELD_REC_DATE], RECS_DATE_FORMAT)
         later_date = rec_date + DATE_CHANGE
@@ -118,6 +126,23 @@ def price_change_hist(input, pickle_file):
         # get rid of annoying commas in text
         for t in l:
             t = t.replace(",", ";")
+
+        # Don't deal with exchange rates
+        l[FIELD_REC_PRICE_1Y] = l[FIELD_REC_PRICE_1Y].replace('$','')
+
+        # Make sure this isn't a different currency (&euro; or C$ or something else)
+        if any(c.isalpha() for c in l[FIELD_REC_PRICE_1Y]):
+            continue
+
+        # replace '$40.00 -> $42.00' to '40.00,42.00'
+        before_after = l[FIELD_REC_PRICE_1Y].split('->')
+        if len(before_after) == 1:
+            l[FIELD_REC_PRICE_1Y] = before_after[0] + ',' + before_after[0] + ',1.0'   # before and after are equal
+        elif len(before_after) == 2:
+            l[FIELD_REC_PRICE_1Y] = ','.join(before_after).replace(' ','') + \
+                                    ',' + str(float(before_after[1])/float(before_after[0]))
+        else:
+            raise ValueError
 
         print ",".join([l[FIELD_REC_TICKER], l[FIELD_REC_FIRM],
                         re.sub('(.*\s*->\s*)(?P<to>.*)', '\\g<to>', l[FIELD_REC_RANK]),

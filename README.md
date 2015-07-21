@@ -36,6 +36,13 @@ Files
     are the status (buy/sell/etc), and the value is a list of all the percentage changes a year from the recommendation.
     draw_distributions.py takes this dict and creates images of the histograms of the change that follows every the 
     prediction of the analyst a year from the prediction.
+    
+## draw_distributions_per_analyst.py
+    
+
+## draw_price_change_accuracy_hists.py
+    Draws a histogram of Accuracy (|New Price - Target| / |Original Price|)
+
 
 ## ordereddefaultdict.py
     An implementation of OrderedDefaultDict taked from 

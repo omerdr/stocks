@@ -30,6 +30,9 @@ def load_obj(name ):
         return pickle.load(f)
 
 
+class DatesNotAvailableException(Exception):
+    pass
+
 def find_closest(myList, myNumber):
     """
     (Doesn't Assume myList is sorted.) Returns closest value to myNumber.

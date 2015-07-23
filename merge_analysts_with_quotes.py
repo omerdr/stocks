@@ -1,4 +1,4 @@
-'''
+"""
 Input format: (no header line)
 Ticker,Date,Firm,Action,Rating,Price Target
 Sample input: AAL,6/11/2015,JPMorgan Chase & Co.,Reiterated Rating,Overweight,
@@ -9,112 +9,86 @@ Date,Open,High,Low,Close,Volume,Adj Close
 Sample GOOG.txt: 2015-06-29,525.01001,528.609985,520.539978,521.52002,1930900,521.52002
 
 Run with:
-cat data/marketbeat_nasdaq.csv | python price_change_hist.py > data/marketbeat_nasdaq_price_changes_TIMEDIFF.csv
+python merge_analysts_with_quotes.py --historical-quotes-dir=historical-quotes data/marketbeat_nasdaq.csv
 
 Also (for separating analysts):
 cd ~/github/stocks/data/top20_analysts
-find . | parallel "cat {} | python ../../price_change_hist.py --pickle-file {}.pkl -"
-
-pycharm args:
---pickle-file data/top20_analysts/test-bank-of-america.pkl "data/top20_analysts/Bank of America.csv"
-data/marketbeat_nasdaq.csv
-
-'''
+find . | parallel "cat {} | python ../../merge_analysts_with_quotes.py --pickle-file {}.pkl -"
+"""
 from collections import defaultdict
 
 import csv
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from myutils import save_obj, find_closest, DatesNotAvailableException
-from ordereddefaultdict import OrderedDefaultdict
+import errno
+from myutils import save_obj, DatesNotAvailableException
 import re
 import click
 
-FIELD_REC_TICKER    = 0
-FIELD_REC_DATE      = 1
-FIELD_REC_FIRM      = 2
-FIELD_REC_RANK      = 4
-FIELD_REC_PRICE_1Y  = 5
-
-FIELD_QUOTE_DATE    = 0
-FIELD_QUOTE_PRICE   = 4 # take the close price
-
-RECS_DATE_FORMAT = '%m/%d/%Y'
-QUOTES_DATE_FORMAT = '%Y-%m-%d'
-HISTORICAL_QUOTES_PATH = '/home/omer/code/github/stocks/historical-quotes/'
-#DEFAULT_RANKING_PICKLE_FILE = 'data/ranking.pkl'
-DATE_CHANGE = relativedelta(years=1)  # months=6)
-
-HEADER_LINE = 'Ticker,Firm,Action,Date,Old Target,New Target,Target Ratio,Current Price,Price in a year,Price Ratio'
-
-def get_price_change(ticker, start_date, end_date):
-    with open(HISTORICAL_QUOTES_PATH + ticker.upper() + '.txt', 'r') as fp:
-        # build quotes list for the selected stock
-        quotes = OrderedDefaultdict(list)
-        cp = csv.reader(fp)
-
-        try:
-            cp.next()  # skip header line
-        except StopIteration:
-            raise DatesNotAvailableException
-
-        for l in cp:
-            if len(l) < FIELD_QUOTE_PRICE:
-                continue
-            quotes[datetime.strptime(l[FIELD_QUOTE_DATE], QUOTES_DATE_FORMAT)] = float(l[FIELD_QUOTE_PRICE])
-
-        if not quotes or start_date < quotes.keys()[-1] or end_date > quotes.keys()[0]:
-            raise DatesNotAvailableException
-
-        start = quotes[find_closest(quotes.keys(), start_date)]
-        end = quotes[find_closest(quotes.keys(), end_date)]
-
-        return start, end, end / start
-
+from financial_utils import FindPrice, ANALYST_DATA_FIELDS, ANALYST_DATA_DATE_FORMAT
 
 @click.command()
-@click.option('--pickle-file', help='ranking dictionary pickle output file', default=None, type=unicode)  # default=DEFAULT_RANKING_PICKLE_FILE,
+@click.option('--pickle-file', help='ranking dictionary pickle output file', default=None)
+@click.option('--historical-quotes-dir', help='folder containing historical quotes files', default=None)
+@click.option('--header/--no-header', default=False, help='use when input file contains a header line. Default False.')
+@click.option('--header-for-quotes/--no-header-for-quotes', help='quote files have header. Default True.', default=True)
+@click.option('--use-current-date/--use-start-of-qtr', default=False, help='set --use-current-date to use the quote '
+              'on the day that the recommendation was given, instead of the default start of quarter quote')
 @click.argument('input', type=click.File('rb'))
-def price_change_hist(input, pickle_file):
+def price_change_hist(input, pickle_file, historical_quotes_dir, header, header_for_quotes, use_current_date):
     ranking = defaultdict(list)
+    find_quotes = FindPrice(historical_quotes_dir, header_for_quotes)
+
+    if header:
+        input.next()
+
+    if use_current_date:
+        HEADER_LINE = 'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,Current_Price,Price_in_1yr,Price_Ratio'
+    else:
+        HEADER_LINE = 'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,SOQ_Price,Price_EOQ_next_year,Price_Ratio'
+
     print HEADER_LINE
+
     for l in csv.reader(input):
-        rec_date = datetime.strptime(l[FIELD_REC_DATE], RECS_DATE_FORMAT)
-        later_date = rec_date + DATE_CHANGE
+        rec_date = datetime.strptime(l[ANALYST_DATA_FIELDS.Date.zvalue], ANALYST_DATA_DATE_FORMAT)
 
         try:
-            start, end, delta = get_price_change(l[FIELD_REC_TICKER], rec_date, later_date)
+            if use_current_date:
+                start_price = find_quotes.at(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
+            else:
+                start_price = find_quotes.at_start_of_qtr(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
+            end_price = find_quotes.at_end_of_qtr_next_year(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
+            price_delta = end_price / start_price
         except DatesNotAvailableException:  # Catch when dates are not available
             continue
 
-        to_rank = re.sub('(.*\s*->\s*)(?P<to>.*)', '\\g<to>', l[FIELD_REC_RANK])
-        if delta:
-            ranking[to_rank].append(delta)
+        to_rating = re.sub('(.*\s*->\s*)(?P<to>.*)', '\\g<to>', l[ANALYST_DATA_FIELDS.Rating.zvalue])
+        if pickle_file and price_delta:
+            ranking[to_rating].append(price_delta)
 
         # get rid of annoying commas in text
         for i in range(len(l)):
             l[i] = l[i].replace(",",";")
 
         # Don't deal with exchange rates
-        l[FIELD_REC_PRICE_1Y] = l[FIELD_REC_PRICE_1Y].replace('$','')
+        l[ANALYST_DATA_FIELDS.Price_Target.zvalue] = l[ANALYST_DATA_FIELDS.Price_Target.zvalue].replace('$','')
 
         # Make sure this isn't a different currency (&euro; or C$ or something else)
-        if any(c.isalpha() for c in l[FIELD_REC_PRICE_1Y]):
+        if any(c.isalpha() for c in l[ANALYST_DATA_FIELDS.Price_Target.zvalue]):
             continue
 
         # replace '$40.00 -> $42.00' to '40.00,42.00'
-        before_after = l[FIELD_REC_PRICE_1Y].split('->')
+        before_after = l[ANALYST_DATA_FIELDS.Price_Target.zvalue].split('->')
         if len(before_after) == 1:
-            l[FIELD_REC_PRICE_1Y] = before_after[0] + ',' + before_after[0] + ',1.0'   # before and after are equal
+            l[ANALYST_DATA_FIELDS.Price_Target.zvalue] = before_after[0] + ',' + before_after[0] + ',1.0'
         elif len(before_after) == 2:
-            l[FIELD_REC_PRICE_1Y] = ','.join(before_after).replace(' ','') + \
+            l[ANALYST_DATA_FIELDS.Price_Target.zvalue] = ','.join(before_after).replace(' ','') + \
                                     ',' + str(float(before_after[1])/float(before_after[0]))
         else:
             raise ValueError
 
-        print ",".join([l[FIELD_REC_TICKER], l[FIELD_REC_FIRM], to_rank, l[FIELD_REC_DATE],
-                        l[FIELD_REC_PRICE_1Y],  # before, after, ratio
-                        str(start), str(end), str(delta)])
+        print ",".join([l[ANALYST_DATA_FIELDS.Ticker.zvalue], l[ANALYST_DATA_FIELDS.Firm.zvalue], to_rating,
+                        l[ANALYST_DATA_FIELDS.Date.zvalue], l[ANALYST_DATA_FIELDS.Price_Target.zvalue],
+                        str(start_price), str(end_price), str(price_delta)])
 
     if pickle_file:
         save_obj(ranking, pickle_file)
@@ -123,7 +97,8 @@ def price_change_hist(input, pickle_file):
 if __name__ == "__main__":
     try:
         price_change_hist()
-        # with open('data/marketbeat_nasdaq.csv') as fp:
-        #     price_change_hist(fp)
     except KeyboardInterrupt:
         pass
+    except IOError, e:
+        if e.errno != errno.EPIPE:
+            raise e

@@ -31,6 +31,11 @@ Files
     Taking in recommendations and prices and outputs a histogram. For every type of recommendation (buy/sell/etc), what
     was the price change a year after the recommendation was given (in percentage).
     
+## merge_analysts_with_quotes.py
+    A newer version of price_change_hist.py, cleaned up (uses myutils and financial_utils) and added support for
+    start/end of quarter quotes (instead of current date and precisely a year from now). This support allows creating
+    a baseline for comparing analyst recommendations.
+    
 ## draw_distributions.py
     one of the outputs of price_change_hist.py is a pickle saved to ranking.pkl, that contains a dict where the keys
     are the status (buy/sell/etc), and the value is a list of all the percentage changes a year from the recommendation.
@@ -38,7 +43,15 @@ Files
     prediction of the analyst a year from the prediction.
     
 ## draw_distributions_per_analyst.py
+
+## hist_from_file.py
+    Gets comma separated key-value pairs, and plots hist of the values for every key 
+    (given more than threshold occurrences). Very useful utility.
     
+## normalize_field.py
+    Gets csv file as input, and adds another field at the end of every line with the v/sum(v), where v is the value at
+    'value-field' and the sum is over all the values with the same key (specified by 'key-field').
+    Also a very useful utility for functions that are a bit too verbose with awk (now also supports count & average).
 
 ## draw_price_change_accuracy_hists.py
     Draws a histogram of Accuracy (|New Price - Target| / |Original Price|)
@@ -53,3 +66,10 @@ Files
 ## filter-top-20-analysts.sh
     Shell script for taking the analysts with the most recommendations (top 20), and creating a separate recommendation
     file for each under data/top20_analysts.csv.
+    
+## data/marketbeat_baseline_SOQ_EOQ_price_target_change.csv
+    Contains analyst recommendations with actual price changes. For every recommendations, the quotes given in this 
+    file are from the start of the corresponding quarter (SOQ) to the end of the same quarter in the following 
+    year (EOQ).
+    This file was generated using:
+    ```python merge_analysts_with_quotes.py --historical-quotes-dir=historical-quotes data/marketbeat_nasdaq.csv > data/marketbeat_baseline_SOQ_EOQ_price_target_change.csv```

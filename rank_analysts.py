@@ -10,18 +10,22 @@ from datetime import datetime
 import os
 import click
 import csv
-from financial_utils import RECO_FIELDS, FindPrice, RECO_DATE_FORMAT
-from myutils import DatesNotAvailableException
+import errno
+from financial_utils import PRICE_CHANGE_FIELDS, FindPrice, PRICE_CHANGE_DATE_FORMAT
+from myutils import DatesNotAvailableException, ZeroBasedEnum
 
 HEADER_LINE = 'Ticker,Firm,Action,Date,CurrentPrice,TargetPrice,EOQ_FinalPrice,L1PercentageDistance'
 
 @click.command()
 @click.option('--header/--no-header', default=False)
+@click.option('--find-quotes/--use-input-quotes', default=True, help='Set --use-input-quotes to use input file for '
+                                                                     '"current price" and "price in a year".')
 @click.option('--quotes-dir', default=os.getcwd(),
-              help='The path containing a txt file for every company with it\'s historical prices')
+              help='The path containing a txt file for every company with it\'s historical prices. Only needed when '
+                   '--use-input-quotes isn\'t set')
 @click.argument('reco_file', type=click.File('rb'))  # , help='analyst recommendations file')
-def rank_analysts(header, quotes_dir, reco_file):
-    find_quotes = FindPrice(quotes_dir)
+def rank_analysts(header, find_quotes, quotes_dir, reco_file):
+    find_price = FindPrice(quotes_dir)
 
     f_reco = csv.reader(reco_file)
     if header:
@@ -30,32 +34,39 @@ def rank_analysts(header, quotes_dir, reco_file):
     print HEADER_LINE
     for l in f_reco:
 
-        if (l[RECO_FIELDS.Firm.zvalue] and
-            l[RECO_FIELDS.Date.zvalue] and
-            l[RECO_FIELDS.Ticker.zvalue] and
-            l[RECO_FIELDS.New_Target.zvalue] and
-            l[RECO_FIELDS.Current_Price.zvalue]):
+        if (l[PRICE_CHANGE_FIELDS.Firm.zvalue] and
+            l[PRICE_CHANGE_FIELDS.Date.zvalue] and
+            l[PRICE_CHANGE_FIELDS.Ticker.zvalue] and
+            l[PRICE_CHANGE_FIELDS.New_Target.zvalue] and
+            l[PRICE_CHANGE_FIELDS.Current_Price.zvalue]):
 
-            current_date = datetime.strptime(l[RECO_FIELDS.Date.zvalue], RECO_DATE_FORMAT)
-            target_price = float(l[RECO_FIELDS.New_Target.zvalue])
-            # trust the quotes recorded prices more than the analyst data
-            #current_price = float(l[RECO_FIELDS.Current_Price.zvalue])
+            current_date = datetime.strptime(l[PRICE_CHANGE_FIELDS.Date.zvalue], PRICE_CHANGE_DATE_FORMAT)
+            target_price = float(l[PRICE_CHANGE_FIELDS.New_Target.zvalue])
 
-            try:
-                current_price = find_quotes.at(l[RECO_FIELDS.Ticker.zvalue], current_date)
-                final_price = find_quotes.at_end_of_qtr_next_year(l[RECO_FIELDS.Ticker.zvalue], current_date)
-            except DatesNotAvailableException:
-                continue
+            if not find_quotes:
+                current_price = float(l[PRICE_CHANGE_FIELDS.Current_Price.zvalue])
+                final_price = float(l[PRICE_CHANGE_FIELDS.Price_in_a_year.zvalue])
 
-            to_print = [l[RECO_FIELDS.Ticker.zvalue], l[RECO_FIELDS.Firm.zvalue], l[RECO_FIELDS.Action.zvalue],
-                            current_date.date(), current_price, target_price,
-                            final_price, abs(final_price - target_price) / current_price]
+            else:
+                try:
+                    # find quotes instead of trusting the input file
+                    current_price = find_price.at(l[PRICE_CHANGE_FIELDS.Ticker.zvalue], current_date)
+                    final_price = find_price.at_end_of_qtr_next_year(l[PRICE_CHANGE_FIELDS.Ticker.zvalue], current_date)
+                except DatesNotAvailableException:
+                    continue
+
+            to_print = [l[PRICE_CHANGE_FIELDS.Ticker.zvalue], l[PRICE_CHANGE_FIELDS.Firm.zvalue],
+                        l[PRICE_CHANGE_FIELDS.Action.zvalue],
+                        current_date.date(), current_price, target_price,
+                        final_price, abs(final_price - target_price) / current_price]
 
             print ",".join([str(i) for i in to_print])
-
 
 if __name__ == "__main__":
     try:
         rank_analysts()
     except KeyboardInterrupt:
         pass
+    except IOError, e:
+        if e.errno != errno.EPIPE:
+            raise e

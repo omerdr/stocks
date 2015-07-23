@@ -5,14 +5,17 @@ import os
 from myutils import ZeroBasedEnum, find_closest, DatesNotAvailableException
 from ordereddefaultdict import OrderedDefaultdict
 
-RECO_HEADER_LINE = \
+ANALYST_DATA_HEADER_LINE = 'Ticker,Date,Firm,Action,Rating,Price_Target'
+PRICE_CHANGE_HEADER_LINE = \
     'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,Current_Price,Price_in_a_year,Price_Ratio'
 QUOTES_HEADER_LINE = 'Date,Open,High,Low,Close,Volume,Adj_Close'
 
-RECO_FIELDS = ZeroBasedEnum('RECO_FIELDS', RECO_HEADER_LINE)
+ANALYST_DATA_FIELDS = ZeroBasedEnum('ANALYST_DATA_FIELDS', ANALYST_DATA_HEADER_LINE)
+PRICE_CHANGE_FIELDS = ZeroBasedEnum('PRICE_CHANGE_FIELDS', PRICE_CHANGE_HEADER_LINE)
 QUOT_FIELDS = ZeroBasedEnum('QUOT_FIELDS', QUOTES_HEADER_LINE)
 
-RECO_DATE_FORMAT = '%m/%d/%Y'
+ANALYST_DATA_DATE_FORMAT = '%m/%d/%Y'
+PRICE_CHANGE_DATE_FORMAT = '%m/%d/%Y'
 QUOT_DATE_FORMAT = '%Y-%m-%d'
 
 def parse_historical_quotes_file(ticker, quotes_dir=None, has_header_line=False):
@@ -48,13 +51,11 @@ class FindPrice:
         self.quotes = None
 
     def at(self, ticker, current_date):
-        # Cash quotes array to avoid re-reading the file when asked for the same ticker twice in a row
-        if ticker == self._last_ticker:
-            return self.quotes[find_closest(self.quotes.keys(), current_date)]
-
-        # parse the historical quotes file for the given ticker
-        self.quotes = parse_historical_quotes_file(ticker, self._quotes_dir, self._has_header)
-        self._last_ticker = ticker
+        # Cache quotes array to avoid re-reading the file when asked for the same ticker twice in a row
+        if ticker != self._last_ticker or not self.quotes:
+            # parse the historical quotes file for the given ticker
+            self.quotes = parse_historical_quotes_file(ticker, self._quotes_dir, self._has_header)
+            self._last_ticker = ticker
 
         # if the requested date is outside the file's date range raise exception
         if not self.quotes or current_date < self.quotes.keys()[-1] or current_date > self.quotes.keys()[0]:
@@ -66,7 +67,7 @@ class FindPrice:
     _EOQTBL = (((3,31,0),)*3 + ((6,30,0),)*3 + ((9,30,0),)*3 + ((12,31,0),)*3)  # End of quarter lookup table
     def at_end_of_qtr_next_year(self, ticker, current_date):
         def previous_quarter(ref):
-            entry = self._EOQTBL[ref.month-1]
+            entry = self._EOQTBL[ref.month-1]  # -1 for zero-based-indexing of arrays, not prior month
             return datetime(ref.year-entry[2], entry[0], entry[1])
 
         new_date = current_date + relativedelta(years=1)
@@ -74,3 +75,8 @@ class FindPrice:
 
         return self.at(ticker, new_date)
 
+    _SOQTBL = (((1,1,0),)*3 + ((4,1,0),)*3 + ((7,1,0),)*3 + ((10,1,0),)*3)  # End of quarter lookup table
+    def at_start_of_qtr(self, ticker, current_date):
+        entry = self._SOQTBL[current_date.month-1]  # -1 for zero-based-indexing of arrays, not prior month
+        new_date = datetime(current_date.year-entry[2], entry[0], entry[1])
+        return self.at(ticker, new_date)

@@ -52,13 +52,13 @@ def normalize_field(input_file, header, key_field_number, value_field_number, tr
         # return to the beginning of the temp file
         temp_file.seek(0)
         reader_tp = csv.reader(temp_file)
-        out = csv.writer(stdout)
+        out = csv.writer(stdout, lineterminator='\n')  # by default lineterminator='\n\r'
         if header:
             # print the header line if there is one
             if transformation == 'average':
                 h.append("Avg_" + h[value_field])
             elif transformation == 'count':
-                h.append("Count_" + h[value_field])
+                h.append("Count_" + h[key_field])
             else:
                 h.append("Normalized_" + h[value_field])
             out.writerow(h)

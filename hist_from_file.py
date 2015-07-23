@@ -12,10 +12,11 @@ from matplotlib import pyplot as plt
 @click.option('--range-max', default=None, help='The maximum value of the x-axis in the histogram')
 @click.option('--range-min', default=None, help='The minimum value of the x-axis in the histogram')
 @click.option('--stats/--no-stats', default=True, help='Add stats to titles')
+@click.option('--markers/--no-markers', default=False, help='Add vertical markers to plot')
 @click.option('--columns', default=4, help='Number of columns in the figure (number of subplots in every row)')
 @click.option('--vert-space', default=0.5, help='Vertical spacing between subplots. Default 0.5.')
 @click.argument('input_file', type=click.File('r'))
-def hist_from_file(input_file, header, threshold, range_min, range_max, stats, columns, vert_space):
+def hist_from_file(input_file, header, threshold, range_min, range_max, stats, markers, columns, vert_space):
     """ Gets comma separated key-value pairs, and plots hist of the values for every key
     (given more than threshold occurrences) """
     values = defaultdict(list)
@@ -56,9 +57,14 @@ def hist_from_file(input_file, header, threshold, range_min, range_max, stats, c
         if len(v) > threshold:
             plt.subplot(ceil(plots / float(columns)), int(columns), i)
             if stats:
-                k += "\nm=%0.3f,\ts=%0.3f,\tmed=%0.3f" % (mean(v), std(v), median(v))
+                k += "\nm=%0.2f,s=%0.2f,med=%0.2f" % (mean(v), std(v), median(v))
             draw_hist(k, v, (min_value, max_value), ylabel="Count", xlabel=h[1])
-            print k.replace('\n', ': \t') + " has " + str(len(v)) + " values"
+            if markers:
+                plt.axvline(mean(v), color='r', linestyle='-')
+                plt.axvline(mean(v)+std(v), color='r', linestyle='--')
+                plt.axvline(mean(v)-std(v), color='r', linestyle='--')
+                plt.axvline(median(v), color='b', linestyle='-')
+            print k.replace('\n', ': \t') + ", Count:" + str(len(v))
             i += 1
 
 

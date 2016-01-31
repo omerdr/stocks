@@ -19,6 +19,8 @@ import errno
               help='Instead of normalizing, only calculate average')
 @click.option('--count', 'transformation', flag_value='count', default=False,
               help='Instead of normalizing, only count occurrences')
+@click.option('--sum', 'transformation', flag_value='sum', default=False,
+              help='Instead of normalizing, only sum occurrences')
 @click.argument('input_file', type=click.File('r'))
 def normalize_field(input_file, header, key_field_number, value_field_number, transformation):
     """
@@ -59,6 +61,8 @@ def normalize_field(input_file, header, key_field_number, value_field_number, tr
                 h.append("Avg_" + h[value_field])
             elif transformation == 'count':
                 h.append("Count_" + h[key_field])
+            elif transformation == 'sum':
+                h.append("Sum_" + h[key_field])
             else:
                 h.append("Normalized_" + h[value_field])
             out.writerow(h)
@@ -68,6 +72,8 @@ def normalize_field(input_file, header, key_field_number, value_field_number, tr
                 l.append(str(sums[k] / counts[k]))
             elif transformation == 'count':
                 l.append(str(counts[k]))
+            elif transformation == 'sum':
+                l.append(str(sums[k]))
             else:
                 l.append(str(v / sums[k]))
             out.writerow(l)

@@ -67,7 +67,6 @@ def hist_from_file(input_file, header, threshold, range_min, range_max, stats, m
             print k.replace('\n', ': \t') + ", Count:" + str(len(v))
             i += 1
 
-
     plt.subplots_adjust(hspace=float(vert_space))  # tweak spacing to prevent clipping of x-label
     plt.show()
 

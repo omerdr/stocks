@@ -12,7 +12,7 @@ from sys import stderr
 MARKETBEAT_NASDAQ_MOST_RECENT_URL = 'http://www.marketbeat.com/stocks/NASDAQ/{0}/?MostRecent=1'
 MARKETBEAT_NASDAQ_URL = MARKETBEAT_NASDAQ_MOST_RECENT_URL
 #OUTPUT_FILE = 'data/tmp.csv' #'data/marketbeat_nasdaq.csv' # append
-OUTPUT_FILE = 'data/marketbeat_nasdaq_latest.csv' # append
+OUTPUT_FILE = 'data/marketbeat_nasdaq_twisted.csv' # append
 NASDAQ_TICKERS_TXT_FILE = 'NASDAQ.txt'
 
 # <codecell>

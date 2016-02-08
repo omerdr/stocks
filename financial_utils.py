@@ -18,6 +18,7 @@ ANALYST_DATA_DATE_FORMAT = '%m/%d/%Y'
 PRICE_CHANGE_DATE_FORMAT = '%m/%d/%Y'
 QUOT_DATE_FORMAT = '%Y-%m-%d'
 
+
 def parse_historical_quotes_file(ticker, quotes_dir=None, has_header_line=False):
     if not quotes_dir:
         quotes_dir = os.getcwd()
@@ -35,7 +36,7 @@ def parse_historical_quotes_file(ticker, quotes_dir=None, has_header_line=False)
         for l in cp:
             if len(l) < len(QUOT_FIELDS):
                 continue
-            quotes[datetime.strptime(l[QUOT_FIELDS.Date.zvalue], QUOT_DATE_FORMAT)] = float(l[QUOT_FIELDS.Close.zvalue])
+            quotes[datetime.strptime(l[QUOT_FIELDS.Date.zvalue], QUOT_DATE_FORMAT)] = float(l[QUOT_FIELDS.Adj_Close.zvalue])
 
         if len(quotes) == 0:
             return None
@@ -65,15 +66,17 @@ class FindPrice:
         return float(self.quotes[find_closest(self.quotes.keys(), current_date)])
 
     _EOQTBL = (((3,31,0),)*3 + ((6,30,0),)*3 + ((9,30,0),)*3 + ((12,31,0),)*3)  # End of quarter lookup table
+    def _end_of_quarter(self, ref):
+        entry = self._EOQTBL[ref.month-1]  # -1 for zero-based-indexing of arrays, not prior month
+        return datetime(ref.year-entry[2], entry[0], entry[1])
+
     def at_end_of_qtr_next_year(self, ticker, current_date):
-        def previous_quarter(ref):
-            entry = self._EOQTBL[ref.month-1]  # -1 for zero-based-indexing of arrays, not prior month
-            return datetime(ref.year-entry[2], entry[0], entry[1])
-
         new_date = current_date + relativedelta(years=1)
-        new_date = previous_quarter(new_date)
-
+        new_date = self._end_of_quarter(new_date)
         return self.at(ticker, new_date)
+
+    def at_end_of_qtr(self, ticker, current_date):
+        return self.at(ticker, self._end_of_quarter(current_date))
 
     _SOQTBL = (((1,1,0),)*3 + ((4,1,0),)*3 + ((7,1,0),)*3 + ((10,1,0),)*3)  # End of quarter lookup table
     def at_start_of_qtr(self, ticker, current_date):

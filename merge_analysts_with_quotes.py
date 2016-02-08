@@ -9,7 +9,7 @@ Date,Open,High,Low,Close,Volume,Adj Close
 Sample GOOG.txt: 2015-06-29,525.01001,528.609985,520.539978,521.52002,1930900,521.52002
 
 Run with:
-python merge_analysts_with_quotes.py --historical-quotes-dir=historical-quotes data/marketbeat_nasdaq.csv
+python merge_analysts_with_quotes.py --historical-quotes-dir=historical-quotes data/marketbeat_nasdaq_full_2014.csv
 
 Also (for separating analysts):
 cd ~/github/stocks/data/top20_analysts
@@ -31,8 +31,8 @@ from financial_utils import FindPrice, ANALYST_DATA_FIELDS, ANALYST_DATA_DATE_FO
 @click.option('--historical-quotes-dir', help='folder containing historical quotes files', default=None)
 @click.option('--header/--no-header', default=False, help='use when input file contains a header line. Default False.')
 @click.option('--header-for-quotes/--no-header-for-quotes', help='quote files have header. Default True.', default=True)
-@click.option('--use-current-date/--use-start-of-qtr', default=False, help='set --use-current-date to use the quote '
-              'on the day that the recommendation was given, instead of the default start of quarter quote')
+@click.option('--use-current-date/--use-end-of-qtr', default=False, help='set --use-current-date to use the quote '
+              'on the day that the recommendation was given, instead of the default end of quarter quote')
 @click.argument('input', type=click.File('rb'))
 def price_change_hist(input, pickle_file, historical_quotes_dir, header, header_for_quotes, use_current_date):
     ranking = defaultdict(list)
@@ -44,7 +44,7 @@ def price_change_hist(input, pickle_file, historical_quotes_dir, header, header_
     if use_current_date:
         HEADER_LINE = 'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,Current_Price,Price_in_1yr,Price_Ratio'
     else:
-        HEADER_LINE = 'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,SOQ_Price,Price_EOQ_next_year,Price_Ratio'
+        HEADER_LINE = 'Ticker,Firm,Action,Date,Old_Target,New_Target,Target_Ratio,EOQ_Price,Price_EOQ_next_year,Price_Ratio'
 
     print HEADER_LINE
 
@@ -55,7 +55,7 @@ def price_change_hist(input, pickle_file, historical_quotes_dir, header, header_
             if use_current_date:
                 start_price = find_quotes.at(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
             else:
-                start_price = find_quotes.at_start_of_qtr(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
+                start_price = find_quotes.at_end_of_qtr(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
             end_price = find_quotes.at_end_of_qtr_next_year(l[ANALYST_DATA_FIELDS.Ticker.zvalue], rec_date)
             price_delta = end_price / start_price
         except DatesNotAvailableException:  # Catch when dates are not available

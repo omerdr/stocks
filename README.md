@@ -1,5 +1,39 @@
+To create prediction matrix:
+============================
+
+1. Run 'scrape_marketbeat_recommendations.py' to get the new analyst predictions.
+
+    This will create 'marketbeat_nasdaq.csv'. 
+    Note they only keep about 2 years in the past, and that's also somewhat diluted, so better to use a file that was 
+    generated a while back (we normally want their predictions from over a year ago to compare to the results a year 
+    later).
+    
+2. Run 'download_all_tickers.sh'.
+
+    This will mine Yahoo! Finance for stocks prices and create 'historical_data'.
+    
+3. Run 'merge_analysts_with_quotes.py'
+
+    This will take the analyst prediction file and the stock prices and combine them into a single file with:
+    'Ticker, Firm, Action, Date, Old_Target, New_Target, Target_Ratio, EOQ_Price, Price_EOQ_next_year, Price_Ratio'.    
+    Which can be used to create the final matrix
+    
+4. Run 'structure_data_matrix_for_regression.py'
+    
+    This will output 'data_matrix.mat' with everything that's need.
+    A little more parsing is still required, and is done using 'parse_data_matrix.m'
+    
+5. Run 'parse_data_matrix.m'
+    
+    This will separate the data matrix Z, the true response vector y, and the labels.
+
 Files
 =====
+
+## scrape_marketbeat_recommendations.py
+    Python code for scraping marketbeat.com for analyst recommendations.
+    This is the faster way to go to get the marketbeat analyst recommendations.
+    The output is a large file with the fields: Ticker, Research Firm, Action, Recommendation, Price Change    
 
 ## scrape-with-twisted.py:
     Python code for scraping marketbeat.com for analyst recommendations.
